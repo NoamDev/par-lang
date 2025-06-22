@@ -1,0 +1,4 @@
+type Snake = iterative self
+
+dec NewSnake : Snake
+def NewSnake = unfounded/first let tail = loop/first in unfounded/second  loop/second

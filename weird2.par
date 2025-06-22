@@ -1,0 +1,36 @@
+type G<a, b> = choice {
+  .left => a,
+  .right => either {
+    .end!,
+    .step b,
+  }
+}
+
+type T1 = iterative/a recursive/b G<self/a, self/b>
+
+type T2 = recursive/b iterative/a G<self/a, self/b>
+
+type MyNat = either {
+  .zero!,
+  .succ MyNat,
+}
+
+def X1: T1 =
+    let n: MyNat = .succ.zero! in
+    begin/a
+    n.begin/b.case {
+        .zero! => case {
+            .left => {
+                let n = .succ.zero! in
+                loop/a
+            },
+            .right => .end!
+        },
+        .succ remaining => case {
+            .left => {
+                let n = remaining in
+                loop/a
+            },
+            .right => .step remaining.loop/b
+        }
+    }

@@ -1,0 +1,39 @@
+type G<a, b> = choice {
+  .left => a,
+  .right => either {
+    .end!,
+    .step b,
+  }
+}
+
+type T1 = iterative/a recursive/b G<self/a, self/b>
+
+type T2 = recursive/b iterative/a G<self/a, self/b>
+
+def X1: T1 = chan c {
+  let n = 5
+  c.begin/a
+  Nat.Repeat(n).begin/b.case {
+    .end! => {
+      c.case {
+        .left => {
+          let n = 5
+          c.loop/a
+        }
+        .right => { c.end! }
+      }
+    }
+    .step remaining => {
+      c.case {
+        .left => {
+          let n = 5
+          c.loop/a
+        }
+        .right => {
+          c.step
+          remaining.loop/b
+        }
+      }
+    }
+  }
+}

@@ -1,10 +1,10 @@
 use std::{
     future::Future,
-    sync::{Arc, Mutex},
+    sync::{Arc, LockResult, Mutex},
 };
 
 use arcstr::{ArcStr, Substr};
-use futures::channel::oneshot;
+use futures::channel::{mpsc, oneshot};
 use num_bigint::BigInt;
 
 use crate::{
@@ -18,14 +18,63 @@ use crate::{
 
 use super::{compiler::TypedTree, Net, Tree};
 
+pub(crate) mod private{
+    use std::sync::{Arc, LockResult, Mutex};
+    use futures::channel::mpsc;
+    use futures::SinkExt;
+    use crate::icombs::Net;
+    use crate::icombs::net::ReducerMessage;
+
+    pub struct NetWrapper {
+        net: Arc<Mutex<Net>>,
+        notify: mpsc::UnboundedSender<crate::icombs::net::ReducerMessage>
+    }
+
+    impl NetWrapper {
+        pub(crate) fn new(net: Arc<Mutex<Net>>, mut notify: mpsc::UnboundedSender<crate::icombs::net::ReducerMessage>) -> Self {
+            println!("Notifying started");
+            notify.unbounded_send(ReducerMessage::Start).expect("notify started failed");
+            Self { net, notify }
+        }
+        pub(crate) fn lock(&self) -> LockResult<std::sync::MutexGuard<'_, Net>> {
+            self.net.lock()
+        }
+        
+        pub(crate) fn net(&self) -> Arc<Mutex<Net>> {
+            Arc::clone(&self.net)
+        }
+    }
+
+    impl Clone for NetWrapper {
+        fn clone(&self) -> Self {
+            println!("Notifying started");
+            self.notify.unbounded_send(ReducerMessage::Start).expect("notify started failed");
+            Self {
+                net: Arc::clone(&self.net),
+                notify: self.notify.clone(),
+            }
+        }
+    }
+
+    impl Drop for NetWrapper {
+        fn drop(&mut self) {
+            println!("Notifying stopped");
+            self.notify.unbounded_send(ReducerMessage::Stop).expect("notify stopped failed");
+        }
+    }
+}
+
+use private::NetWrapper;
+use crate::icombs::net::ReducerMessage;
+
 pub struct Handle {
-    net: Arc<Mutex<Net>>,
+    net: NetWrapper,
     tree: Option<Tree>,
 }
 
 pub struct TypedHandle {
     type_defs: TypeDefs,
-    net: Arc<Mutex<Net>>,
+    net: NetWrapper,
     tree: TypedTree,
 }
 
@@ -50,9 +99,9 @@ pub enum TypedReadback {
 }
 
 impl Handle {
-    pub fn new(net: Arc<Mutex<Net>>, tree: Tree) -> Self {
+    pub fn new(net: Arc<Mutex<Net>>, notify:mpsc::UnboundedSender<ReducerMessage>, tree: Tree) -> Self {
         Self {
-            net,
+            net: NetWrapper::new(net, notify),
             tree: Some(tree),
         }
     }
@@ -155,7 +204,7 @@ impl Handle {
 
         self.tree = Some(u0);
         Self {
-            net: Arc::clone(&self.net),
+            net: self.net.clone(),
             tree: Some(t0),
         }
     }
@@ -173,7 +222,7 @@ impl Handle {
 
         self.tree = Some(u0);
         Self {
-            net: Arc::clone(&self.net),
+            net: self.net.clone(),
             tree: Some(t0),
         }
     }
@@ -219,7 +268,15 @@ impl Handle {
 }
 
 impl TypedHandle {
-    pub fn new(type_defs: TypeDefs, net: Arc<Mutex<Net>>, tree: TypedTree) -> Self {
+    pub fn new(type_defs: TypeDefs, net: Arc<Mutex<Net>>, notify: mpsc::UnboundedSender<ReducerMessage>, tree: TypedTree) -> Self {
+        Self {
+            type_defs,
+            net: NetWrapper::new(net, notify),
+            tree,
+        }
+    }
+
+    pub fn from_wrapper(type_defs: TypeDefs, net: NetWrapper, tree: TypedTree) -> Self {
         Self {
             type_defs,
             net,
@@ -227,8 +284,9 @@ impl TypedHandle {
         }
     }
 
+
     pub fn net(&self) -> Arc<Mutex<Net>> {
-        Arc::clone(&self.net)
+       self.net.net()
     }
 
     pub async fn readback(mut self) -> TypedReadback {
@@ -418,7 +476,7 @@ impl TypedHandle {
 
         let t_handle = Self {
             type_defs: self.type_defs.clone(),
-            net: Arc::clone(&self.net),
+            net: self.net.clone(),
             tree: t0.with_type(t.dual(Span::None)),
         };
         let u_handle = Self {
@@ -445,7 +503,7 @@ impl TypedHandle {
 
         let t_handle = Self {
             type_defs: self.type_defs.clone(),
-            net: Arc::clone(&self.net),
+            net: self.net.clone(),
             tree: t0.with_type(*t),
         };
         let u_handle = Self {

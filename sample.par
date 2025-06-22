@@ -1,0 +1,6 @@
+
+def Main2 = Console.Open
+  .print("Hello, world!")
+  .close
+
+def Main = !

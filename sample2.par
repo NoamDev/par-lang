@@ -1,0 +1,31 @@
+type Test = iterative/outer choice {
+
+  .enter => recursive/inner either {
+      .long !,
+      .okay self/inner,
+    
+  }
+}
+
+type MyNat = recursive either {
+  .end!,
+  .step self,
+}
+
+def Test: Test = chan yield {
+  yield.begin/inner.case {
+
+    .enter => {
+      let limit: MyNat = .step.step.step.end!
+      limit.begin/outer
+
+          limit.case {
+            .end! => { yield.long! }
+            .step => {
+              yield.okay
+              limit.loop/outer
+            }
+      }
+    }
+  }
+}

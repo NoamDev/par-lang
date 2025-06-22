@@ -1,7 +1,16 @@
-use crate::playground::Playground;
+use std::fs::File;
+use crate::playground::{Compiled, Error, Playground};
 use clap::{arg, command, value_parser, Command};
 use eframe::egui;
 use std::path::PathBuf;
+use std::sync::Arc;
+use colored::Colorize;
+use futures::future::MaybeDone::Future;
+use futures::task::SpawnExt;
+use crate::icombs::readback::{TypedHandle, TypedReadback};
+use crate::par::types::Type;
+use crate::readback::{Element, Event};
+use crate::spawn::TokioSpawn;
 
 mod icombs;
 mod language_server;
@@ -67,8 +76,94 @@ fn run_playground(file: Option<PathBuf>) {
     });
 }
 
+fn run_function(file: PathBuf, function: String) {
+    // This function is currently not implemented.
+    // It is intended to run a specific function from a Par file in the playground.
+    // The implementation would involve reading the file, compiling it, and executing the specified function.
+
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        println!("Running function '{}' from file '{}'", function, file.display());
+        let Ok(code) = File::open(file).and_then(|mut file| {
+            use std::io::Read;
+            let mut buf = String::new();
+            file.read_to_string(&mut buf)?;
+            Ok(buf)
+        }) else {
+            println!("{}", "Could not read file".bright_red());
+            return;
+        };
+
+        // let mut interact: Option<playground::Interact> = None;
+
+        let compiled = match stacker::grow(32 * 1024 * 1024, || Compiled::from_string(&code)) {
+            Ok(compiled) => { compiled }
+            Err(err) => {
+                println!("Compilation failed: {:?}", err);
+                return;
+            }
+        };
+
+        let Ok(checked) = compiled.checked else {
+            println!("Type check failed");
+            return;
+        };
+
+        let program = checked.program;
+
+        let Some((name, definition)) = program
+            .definitions
+            .iter()
+            .find(|(name, definition)| name.primary == function)
+            .clone()
+        else {
+            println!("{}: {}", "Function not found".bright_red(), function);
+            return;
+        };
+
+        let Some(ic_compiled) = checked.ic_compiled else {
+            println!("{}: {}", "IC compilation failed".bright_red(), function);
+            return;
+        };
+
+        let ty = ic_compiled.get_type_of(name).unwrap();
+
+        let Type::Break(_) = ty else {
+            println!("{}: {}", "Function is not a Break function".bright_red(), function);
+            return;
+        };
+
+        let mut net = ic_compiled.create_net();
+        let child_net = ic_compiled.get_with_name(name).unwrap();
+        let tree = net.inject_net(child_net).with_type(ty.clone());
+
+        let (mut net_arc, reducer_future) = net.start_reducer(Arc::new(TokioSpawn));
+
+        // let ctx = ui.ctx().clone();
+        let spawner = Arc::new(TokioSpawn);
+        let readback_future = spawner.spawn_with_handle(async move {
+            let mut handle = TypedHandle::from_wrapper(program.type_defs.clone(), net_arc, tree);
+            loop {
+                match handle.readback().await {
+                    TypedReadback::Break => {
+                        println!("Break function executed successfully.");
+                        break;
+                    },
+                    _ => {
+                        panic!("Unexpected readback from a break function.");
+                    }
+                }
+            }
+
+        }).unwrap();
+
+        readback_future.await;
+        reducer_future.await;
+    });
+}
+
 // todo: this does not work
-fn run_function(_file: PathBuf, _function: String) {
+fn run_playground_function(_file: PathBuf, _function: String) {
     /*let Ok(code) = File::open(file).and_then(|mut file| {
         use std::io::Read;
         let mut buf = String::new();
