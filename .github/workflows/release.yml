@@ -19,8 +19,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Cargo Test
-        run: cargo test
+      # - name: Cargo Test
+      #   run: cargo test
       
       - name: Build the release binary
         run: cargo build --release

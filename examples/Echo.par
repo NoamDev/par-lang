@@ -1,4 +1,4 @@
-def Main: ! = chan exit {
+def Main:  = chan exit {
   let reader = Os.Stdin
   let writer = Os.Stdout
 
