@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+    branches: [ "test-ci" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run tests
+        run: cd tests && cargo run test
