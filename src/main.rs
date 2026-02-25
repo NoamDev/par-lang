@@ -358,6 +358,6 @@ pub fn test_all_files() -> Result<(), String> {
 }
 
 fn run_tests(file: Option<PathBuf>, filter: Option<String>, max_interactions: u32) {
-    test_all_files().unwrap();
-    // test_runner::run_tests(file, filter, max_interactions);
+    // test_all_files().unwrap();
+    test_runner::run_tests(file, filter, max_interactions);
 }
