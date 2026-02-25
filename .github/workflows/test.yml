@@ -13,8 +13,8 @@ jobs:
     strategy:
       # This creates 10 versions of the job simultaneously
       matrix:
-        iteration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-      # Set fail-fast to false so one failure doesn't stop the other 9
+        iteration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15,16,17,18,19,20]
+      # Set fail-fast to false so one failure doesn't stop the other 19
       fail-fast: false
       
     steps:
