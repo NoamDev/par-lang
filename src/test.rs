@@ -44,7 +44,7 @@ fn check_all_examples() -> Result<(), String> {
 }
 
 #[test]
-pub fn test_all_files() -> Result<(), String> {
+fn test_all_files() -> Result<(), String> {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("tests");
     let mut all_results = vec![];
