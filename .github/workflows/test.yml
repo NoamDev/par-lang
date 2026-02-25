@@ -10,9 +10,18 @@ env:
 jobs:
   test:
     runs-on: macos-15-intel
+    strategy:
+      # This creates 10 versions of the job simultaneously
+      matrix:
+        iteration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      # Set fail-fast to false so one failure doesn't stop the other 9
+      fail-fast: false
+      
     steps:
-      - uses: actions/checkout@v6
-      - name: Run tests
+      - uses: actions/checkout@v4
+      
+      - name: Run tests (Iteration ${{ matrix.iteration }})
         run: cd tests && cargo run test
+        
       - name: cargo test
         run: cargo test
